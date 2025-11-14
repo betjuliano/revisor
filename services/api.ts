@@ -13,10 +13,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     ...(options.headers ?? {}),
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
+  }
 
   if (!response.ok) {
     let message = 'Falha ao comunicar com o servidor.';
