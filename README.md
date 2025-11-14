@@ -119,7 +119,7 @@ O snapshot `data/users.json` será criado automaticamente no primeiro acesso ao 
 | Backend           | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Credenciais do banco |
 | Backend           | `POSTGRES_DB`                   | Nome do banco (ex.: `revisor`) |
 | Backend (opcional)| `DATABASE_URL`                  | String única de conexão Postgres |
-| Backend (opcional)| `POSTGRES_SSL`                  | Define uso de TLS (`true`/`false`) |
+| Backend (opcional)| `POSTGRES_SSL`                  | Define o uso de TLS (`true`/`false`) |
 | Backend (opcional)| `PORT`                          | Porta local da API |
 
 ## Docker
