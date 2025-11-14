@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 const dataDir = path.resolve(__dirname, '..', 'data');
 const snapshotPath = path.join(dataDir, 'users.json');
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const {SUPABASE_URL} = process.env;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
