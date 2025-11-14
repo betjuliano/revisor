@@ -1,0 +1,5 @@
+{
+  "name": "Academic Article Reviewer AI",
+  "description": "An application that uses AI to review academic articles based on two distinct, specialized prompts: one for rigorous peer review in English ('Revisor Periódico') and another for academic writing guidance in Portuguese ('Revisor de Artigos').",
+  "requestFramePermissions": []
+}
