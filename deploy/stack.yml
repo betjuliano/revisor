@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  revisor-api:
+    image: registry.example.com/revisor-api:latest
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Ou utilize DATABASE_URL=postgres://usuario:senha@host:5432/dbname
+      - DATABASE_URL=${DATABASE_URL-}
+      - PORT=4000
+    networks:
+      - iaprojetos
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.revisor-api.rule=Host(`api.seudominio.com`)
+        - traefik.http.routers.revisor-api.entrypoints=websecure
+        - traefik.http.routers.revisor-api.tls.certresolver=letsencryptresolver
+        - traefik.http.services.revisor-api.loadbalancer.server.port=4000
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  revisor-web:
+    image: registry.example.com/revisor-web:latest
+    networks:
+      - iaprojetos
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.revisor-web.rule=Host(`app.seudominio.com`)
+        - traefik.http.routers.revisor-web.entrypoints=websecure
+        - traefik.http.routers.revisor-web.tls.certresolver=letsencryptresolver
+        - traefik.http.services.revisor-web.loadbalancer.server.port=80
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+networks:
+  iaprojetos:
+    external: true

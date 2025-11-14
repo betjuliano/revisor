@@ -1,12 +1,21 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+const resolveApiKey = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) {
+    return String(import.meta.env.VITE_GEMINI_API_KEY);
+  }
+  return undefined;
+};
+
 export const generateReview = async (systemInstruction: string, manuscript: string): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error("A variável de ambiente API_KEY não está configurada");
+  const apiKey = resolveApiKey();
+
+  if (!apiKey) {
+    throw new Error("A variável de ambiente VITE_GEMINI_API_KEY não está configurada.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({
