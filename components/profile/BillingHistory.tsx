@@ -11,14 +11,14 @@ const BillingHistory: React.FC = () => {
                 <p className="text-slate-400">Nenhuma transação ainda.</p>
             ) : (
                 <div className="space-y-3">
-                    {transactions.map((tx, index) => (
-                        <div key={index} className="bg-slate-700/50 p-3 rounded-md flex justify-between items-center text-sm">
+                    {transactions.map((tx) => (
+                        <div key={tx.id} className="bg-slate-700/50 p-3 rounded-md flex justify-between items-center text-sm">
                            <div>
                              <p className="font-semibold text-slate-200">
                                 +{tx.credits.toLocaleString()} Créditos
                              </p>
                              <p className="text-xs text-slate-400">
-                                {tx.date} - {tx.method}
+                                {new Date(tx.createdAt).toLocaleDateString('pt-BR')} - {tx.method}
                              </p>
                            </div>
                            <div className="font-mono text-green-400">

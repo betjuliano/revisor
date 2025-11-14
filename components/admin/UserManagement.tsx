@@ -5,13 +5,23 @@ const UserManagement: React.FC = () => {
   const { users, addCreditsToUser } = useAuth();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [creditsToAdd, setCreditsToAdd] = useState<number>(5000);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAddCredits = (e: React.FormEvent) => {
+  const handleAddCredits = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (selectedUserId && creditsToAdd > 0) {
-      addCreditsToUser(selectedUserId, creditsToAdd);
-      setSelectedUserId(null);
-      setCreditsToAdd(5000);
+      setIsSubmitting(true);
+      try {
+        await addCreditsToUser(selectedUserId, creditsToAdd, 'Crédito do Admin');
+        setSelectedUserId(null);
+        setCreditsToAdd(5000);
+      } catch (err: any) {
+        setError(err?.message ?? 'Não foi possível adicionar créditos no momento.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -20,10 +30,15 @@ const UserManagement: React.FC = () => {
         <h3 className="text-2xl font-bold mb-4 text-slate-200">Gerenciar Usuários</h3>
 
         {/* Add Credits Form */}
+        {error && (
+            <div className="mb-4 text-sm text-red-400 bg-red-900/50 border border-red-500/50 rounded-md px-3 py-2">
+              {error}
+            </div>
+        )}
         <form onSubmit={handleAddCredits} className="mb-6 bg-slate-900/50 p-4 rounded-md flex items-end space-x-4">
             <div>
                 <label htmlFor="user-select" className="block text-sm font-medium text-slate-300 mb-1">Selecionar Usuário</label>
-                <select 
+                <select
                     id="user-select"
                     value={selectedUserId ?? ''}
                     onChange={(e) => setSelectedUserId(Number(e.target.value))}
@@ -49,12 +64,12 @@ const UserManagement: React.FC = () => {
                     step="100"
                 />
             </div>
-            <button 
+            <button
                 type="submit"
-                disabled={!selectedUserId}
+                disabled={!selectedUserId || isSubmitting}
                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
             >
-                Adicionar Créditos
+                {isSubmitting ? 'Adicionando...' : 'Adicionar Créditos'}
             </button>
         </form>
 
