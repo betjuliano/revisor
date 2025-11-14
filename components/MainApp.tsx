@@ -79,9 +79,9 @@ const MainApp: React.FC<MainAppProps> = ({ onNavigateToBilling }) => {
       setOutputText(result);
 
       if (user.tier === 'free') {
-        useFreeWords(wordCount);
+        await useFreeWords(wordCount);
       } else {
-        useCredits(wordCount);
+        await useCredits(wordCount);
       }
     } catch (e: any) {
       setError(e.message || "Ocorreu um erro desconhecido.");
@@ -107,7 +107,7 @@ const MainApp: React.FC<MainAppProps> = ({ onNavigateToBilling }) => {
         return;
     }
     
-    handleSubmit();
+    void handleSubmit();
   };
 
   return (

@@ -1,185 +1,185 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
+import {
+  addCreditsRequest,
+  fetchTransactionsForUser,
+  fetchUsersRequest,
+  loginRequest,
+  useCreditsRequest,
+  useFreeWordsRequest,
+  upgradeUserRequest,
+  type ApiTransaction,
+  type ApiUser,
+} from '../services/api';
 
-const FREE_WORD_LIMIT = 1000;
-const ADMIN_EMAIL = 'admjulianoo@gmail.com';
+export const FREE_WORD_LIMIT = 1000;
 
-type User = {
-  id: number;
-  name: string;
-  email: string;
-  tier: 'free' | 'premium';
-  role: 'user' | 'admin';
-  cpf: string;
-  credits: number;
-  freeWordsUsed: number;
-};
+export type TransactionMethod = 'Mercado Pago' | 'Google Pay' | 'Crédito do Admin' | 'PIX';
 
-type TransactionMethod = 'Mercado Pago' | 'Google Pay' | 'Crédito do Admin' | 'PIX';
+export type User = ApiUser;
 
-type Transaction = {
-  date: string;
-  amount: number;
-  credits: number;
-  method: TransactionMethod;
-};
+export type Transaction = ApiTransaction;
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  isLoading: boolean;
   user: User | null;
   users: User[];
   transactions: Transaction[];
-  login: (email: string, cpf: string) => boolean;
+  login: (email: string, cpf: string) => Promise<boolean>;
   logout: () => void;
-  addCredits: (amount: number, method: TransactionMethod) => void;
-  useCredits: (wordCount: number) => void;
-  useFreeWords: (wordCount: number) => void;
-  upgradeToPremium: () => void;
-  addCreditsToUser: (userId: number, amount: number) => void;
+  refreshUsers: () => Promise<void>;
+  addCredits: (amount: number, method: TransactionMethod, price?: number) => Promise<void>;
+  useCredits: (wordCount: number) => Promise<void>;
+  useFreeWords: (wordCount: number) => Promise<void>;
+  upgradeToPremium: () => Promise<void>;
+  addCreditsToUser: (userId: number, amount: number, method?: TransactionMethod, price?: number) => Promise<void>;
   FREE_WORD_LIMIT: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock database of users
-const initialUsers: User[] = [
-    { id: 1, name: 'Admin User', email: ADMIN_EMAIL, tier: 'premium', role: 'admin', cpf: '000.000.000-00', credits: 999999, freeWordsUsed: 0 },
-    { id: 2, name: 'Premium User', email: 'premium@example.com', tier: 'premium', role: 'user', cpf: '111.111.111-11', credits: 500, freeWordsUsed: 0 },
-    { id: 3, name: 'Free User', email: 'free@example.com', tier: 'free', role: 'user', cpf: '222.222.222-22', credits: 0, freeWordsUsed: 250 },
-];
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const login = (email: string, cpf: string): boolean => {
-    let user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-
-    if (!user) { // If user doesn't exist, create a new one
-        const newUser: User = {
-            id: users.length + 1,
-            name: `Usuário ${cpf.substring(0,3)}`,
-            email,
-            cpf,
-            tier: 'free',
-            role: 'user',
-            credits: 0,
-            freeWordsUsed: 0,
-        };
-        setUsers(prev => [...prev, newUser]);
-        user = newUser;
+  const syncCurrentUser = useCallback((updatedUsers: User[], fallbackUser: User | null = null) => {
+    if (!currentUser && !fallbackUser) {
+      return;
     }
-    
-    setCurrentUser(user);
-    setIsAuthenticated(true);
-    // Load existing transactions or start fresh
-    setTransactions(user.email === 'premium@example.com' ? [
-        { date: new Date().toLocaleDateString(), amount: 10, credits: 5000, method: 'Mercado Pago' }
-    ] : []);
-    
-    return true;
-  };
+    const targetId = fallbackUser?.id ?? currentUser?.id;
+    if (!targetId) {
+      return;
+    }
+    const nextUser = updatedUsers.find((u) => u.id === targetId) ?? fallbackUser ?? null;
+    setCurrentUser(nextUser);
+  }, [currentUser]);
 
-  const logout = () => {
+  const login = useCallback(async (email: string, cpf: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const response = await loginRequest(email, cpf);
+      setCurrentUser(response.user);
+      setUsers(response.users);
+      setTransactions(response.transactions);
+      setIsAuthenticated(true);
+      return true;
+    } catch (error) {
+      console.error('Erro ao autenticar usuário:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(() => {
     setCurrentUser(null);
     setIsAuthenticated(false);
     setTransactions([]);
-  };
-  
-  const updateUserState = (userId: number, updates: Partial<User>) => {
-    let updatedUser: User | null = null;
-    setUsers(prevUsers => prevUsers.map(u => {
-        if (u.id === userId) {
-            updatedUser = { ...u, ...updates };
-            return updatedUser;
+  }, []);
+
+  const refreshUsers = useCallback(async () => {
+    try {
+      const { users: fetchedUsers } = await fetchUsersRequest();
+      setUsers(fetchedUsers);
+      syncCurrentUser(fetchedUsers);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+    }
+  }, [syncCurrentUser]);
+
+  const addCredits = useCallback(async (amount: number, method: TransactionMethod, price?: number) => {
+    if (!currentUser) return;
+    try {
+      const response = await addCreditsRequest(currentUser.id, amount, method, price);
+      setUsers(response.users);
+      setCurrentUser(response.user);
+      setTransactions(response.transactions);
+    } catch (error) {
+      console.error('Erro ao adicionar créditos:', error);
+      throw error;
+    }
+  }, [currentUser]);
+
+  const useCredits = useCallback(async (wordCount: number) => {
+    if (!currentUser) return;
+    try {
+      const response = await useCreditsRequest(currentUser.id, wordCount);
+      setUsers(response.users);
+      setCurrentUser(response.user);
+    } catch (error) {
+      console.error('Erro ao debitar créditos:', error);
+      throw error;
+    }
+  }, [currentUser]);
+
+  const useFreeWords = useCallback(async (wordCount: number) => {
+    if (!currentUser) return;
+    try {
+      const response = await useFreeWordsRequest(currentUser.id, wordCount);
+      setUsers(response.users);
+      setCurrentUser(response.user);
+    } catch (error) {
+      console.error('Erro ao atualizar palavras gratuitas:', error);
+      throw error;
+    }
+  }, [currentUser]);
+
+  const upgradeToPremium = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const response = await upgradeUserRequest(currentUser.id);
+      setUsers(response.users);
+      setCurrentUser(response.user);
+    } catch (error) {
+      console.error('Erro ao fazer upgrade de plano:', error);
+      throw error;
+    }
+  }, [currentUser]);
+
+  const addCreditsToUser = useCallback(async (userId: number, amount: number, method: TransactionMethod = 'Crédito do Admin', price?: number) => {
+    try {
+      const response = await addCreditsRequest(userId, amount, method, price);
+      setUsers(response.users);
+      if (currentUser && currentUser.id === response.user.id) {
+        setCurrentUser(response.user);
+        setTransactions(response.transactions);
+      } else if (currentUser) {
+        syncCurrentUser(response.users);
+        if (currentUser.id === userId) {
+          const { transactions: fetchedTransactions } = await fetchTransactionsForUser(userId);
+          setTransactions(fetchedTransactions);
         }
-        return u;
-    }));
-    if (currentUser && currentUser.id === userId && updatedUser) {
-        setCurrentUser(updatedUser);
+      }
+      if (userId === currentUser?.id) {
+        alert(`Adicionados ${amount.toLocaleString()} créditos com sucesso ao seu saldo.`);
+      } else {
+        alert(`Adicionados ${amount.toLocaleString()} créditos com sucesso ao usuário ID ${userId}.`);
+      }
+    } catch (error) {
+      console.error('Erro ao adicionar créditos para usuário:', error);
+      throw error;
     }
-  };
-
-  const addCredits = (amount: number, method: TransactionMethod) => {
-    if (!currentUser) return;
-    updateUserState(currentUser.id, { credits: currentUser.credits + amount });
-    setTransactions(prev => [...prev, {
-      date: new Date().toLocaleDateString(),
-      amount: (amount / 5000) * 10,
-      credits: amount,
-      method,
-    }]);
-  };
-  
-  const useCredits = (wordCount: number) => {
-    if (!currentUser) return;
-    updateUserState(currentUser.id, { credits: Math.max(0, currentUser.credits - wordCount) });
-  };
-  
-  const useFreeWords = (wordCount: number) => {
-    if (!currentUser) return;
-    updateUserState(currentUser.id, { freeWordsUsed: currentUser.freeWordsUsed + wordCount });
-  };
-  
-  const upgradeToPremium = () => {
-    if (currentUser) {
-        updateUserState(currentUser.id, { tier: 'premium' });
-    }
-  };
-  
-  const addCreditsToUser = (userId: number, amount: number) => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
-    
-    setUsers(prevUsers => {
-        const newUsers = prevUsers.map(u => {
-            if (u.id === userId) {
-                const updates: Partial<User> = { credits: u.credits + amount };
-                if (u.tier === 'free') {
-                    updates.tier = 'premium';
-                }
-                return { ...u, ...updates };
-            }
-            return u;
-        });
-        
-        // Update current user state if they are the one being updated
-        if (currentUser && currentUser.id === userId) {
-            const updatedUser = newUsers.find(u => u.id === userId);
-            if(updatedUser) setCurrentUser(updatedUser);
-        }
-        
-        return newUsers;
-    });
-
-    // Add transaction for the user being credited if they are the current user
-    if (currentUser && currentUser.id === userId) {
-        setTransactions(prev => [...prev, {
-            date: new Date().toLocaleDateString(),
-            amount: 0,
-            credits: amount,
-            method: 'Crédito do Admin',
-        }]);
-    }
-
-    alert(`Adicionados ${amount.toLocaleString()} créditos com sucesso ao usuário ID ${userId}.`);
-  };
+  }, [currentUser, syncCurrentUser]);
 
   return (
-    <AuthContext.Provider value={{ 
-        isAuthenticated, 
-        user: currentUser, 
-        users,
-        transactions,
-        login, 
-        logout, 
-        addCredits, 
-        useCredits,
-        useFreeWords,
-        upgradeToPremium,
-        addCreditsToUser,
-        FREE_WORD_LIMIT
+    <AuthContext.Provider value={{
+      isAuthenticated,
+      isLoading,
+      user: currentUser,
+      users,
+      transactions,
+      login,
+      logout,
+      refreshUsers,
+      addCredits,
+      useCredits,
+      useFreeWords,
+      upgradeToPremium,
+      addCreditsToUser,
+      FREE_WORD_LIMIT,
     }}>
       {children}
     </AuthContext.Provider>

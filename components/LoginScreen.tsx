@@ -2,19 +2,29 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginScreen: React.FC = () => {
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [cpf, setCpf] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (email.trim() && cpf.trim()) {
-        const success = login(email.trim(), cpf.trim());
-        if (!success) {
-            setError('Falha no login. Por favor, verifique suas credenciais.');
-        }
+    if (!email.trim() || !cpf.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const success = await login(email.trim(), cpf.trim());
+      if (!success) {
+        setError('Falha no login. Por favor, verifique suas credenciais.');
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Não foi possível realizar o login.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -58,10 +68,10 @@ const LoginScreen: React.FC = () => {
             </div>
           <button
             type="submit"
-            disabled={!email.trim() || !cpf.trim()}
+            disabled={!email.trim() || !cpf.trim() || isSubmitting || isLoading}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 w-full disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
           >
-            Entrar / Registrar
+            {isSubmitting || isLoading ? 'Entrando...' : 'Entrar / Registrar'}
           </button>
         </form>
         <p className="text-xs text-slate-500 mt-12">
