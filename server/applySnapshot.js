@@ -20,7 +20,64 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+// 1. Extract common Supabase client init into a shared module
+// src/lib/db.js
+import dotenv from 'dotenv'
+import { createClient } from '@supabase/supabase-js'
+dotenv.config()
+
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('Supabase config missing')
+  process.exit(1)
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
+
+// 2. Collapse applyUsers into a single upsert call:
+async function applyUsers(users) {
+  const payload = users
+    .filter(u => u.email)
+    .map(u => ({
+      email: u.email.toLowerCase(),
+      name: u.name ?? null,
+      cpf: u.cpf ?? null,
+      tier: u.tier ?? 'free',
+      role: u.role ?? 'user',
+      credits: u.credits ?? 0,
+      free_words_used: u.freeWordsUsed ?? 0,
+    }))
+
+  const { error } = await supabase
+    .from('users')
+    .upsert(payload, { onConflict: 'email' })
+
+  if (error) throw error
+}
+
+// 3. Bulk‐insert new transactions (optionally use upsert if you have a unique constraint):
+async function applyTransactions(transactionsMap) {
+  const txs = Object.entries(transactionsMap ?? {}).flatMap(([uid, entries]) => {
+    const id = Number(uid)
+    if (Number.isNaN(id)) return []
+    return (entries || []).map(tx => ({
+      user_id: id,
+      credits: tx.credits ?? 0,
+      amount: tx.amount ?? 0,
+      method: tx.method ?? 'Crédito Manual',
+      created_at: tx.createdAt ?? new Date().toISOString(),
+    }))
+  })
+
+  // If you need to dedupe, fetch keys first then filter `txs` here…
+  const { error } = await supabase.from('transactions').insert(txs)
+  if (error) throw error
+}
+
+// 4. In your main file, import { supabase } from 'src/lib/db' and drop duplicated init/fetch logic.
   auth: {
     autoRefreshToken: false,
     persistSession: false,
